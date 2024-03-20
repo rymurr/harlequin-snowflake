@@ -1,20 +1,21 @@
 [tool.poetry]
-name = "harlequin-myadapter"
+name = "harlequin-snowflake"
 version = "0.1.0"
-description = "A Harlequin adapter for <my favorite database>."
-authors = ["Ted Conbeer <tconbeer@users.noreply.github.com>"]
+description = "A Harlequin adapter for Snowflake."
+authors = ["Ryan Murray <rymurr@users.noreply.github.com>"]
 license = "MIT"
 readme = "README.md"
 packages = [
-    { include = "harlequin_myadapter", from = "src" },
+    { include = "harlequin_snowflake", from = "src" },
 ]
 
 [tool.poetry.plugins."harlequin.adapter"]
-my-adapter = "harlequin_myadapter:MyAdapter"
+snowflake-adapter = "harlequin_snowflake:SnowflakeAdapter"
 
 [tool.poetry.dependencies]
 python = ">=3.8.1,<4.0"
 harlequin = "^1.7"
+snowflake-connector-python = {version = "^3.7.1", extras = ["pandas"]}
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.1.6"

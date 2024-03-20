@@ -6,10 +6,11 @@ from harlequin.options import (
     TextOption,
 )
 
+## TODO! How does harlequin do username/password?
 foo = TextOption(
     name="foo",
     description="Help text goes here",
     short_decls=["-f"],
 )
 
-MYADAPTER_OPTIONS = [foo]
+SNOWFLAKEADAPTER_OPTIONS = [foo]

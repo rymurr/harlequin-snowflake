@@ -12,10 +12,11 @@ from harlequin.catalog import Catalog, CatalogItem
 from harlequin.exception import HarlequinConnectionError, HarlequinQueryError
 from textual_fastdatatable.backend import AutoBackendType
 
-from harlequin_myadapter.cli_options import MYADAPTER_OPTIONS
+from harlequin_snowflake.cli_options import SNOWFLAKEADAPTER_OPTIONS
+from snowflake.connector import connect
 
 
-class MyCursor(HarlequinCursor):
+class SnowflakeCursor(HarlequinCursor):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.cur = args[0]
         self._limit: int | None = None
@@ -25,7 +26,7 @@ class MyCursor(HarlequinCursor):
         types = self.cur.column_types
         return list(zip(names, types))
 
-    def set_limit(self, limit: int) -> MyCursor:
+    def set_limit(self, limit: int) -> SnowflakeCursor:
         self._limit = limit
         return self
 
@@ -42,21 +43,29 @@ class MyCursor(HarlequinCursor):
             ) from e
 
 
-class MyConnection(HarlequinConnection):
+class SnowflakeConnection(HarlequinConnection):
     def __init__(
-        self, conn_str: Sequence[str], *args: Any, init_message: str = "", **kwargs: Any
+        self, conn_str: Sequence[str], *args: Any, **kwargs: Any
     ) -> None:
-        self.init_message = init_message
         try:
-            self.conn = "your database library's connect method goes here"
+            ## TODO set up config better
+            self.conn =connect(user=kwargs['username'],
+                                       password=os.environ['SNOWSQL_PWD'],
+                                       account=kwargs['account'],
+                                       database=kwargs['database'].upper(),
+                                       host=kwargs['hostname'],
+                                       role=kwargs['role'],
+                                       warehouse=kwargs['warehouse']
+                                       )
+
         except Exception as e:
             raise HarlequinConnectionError(
-                msg=str(e), title="Harlequin could not connect to your database."
+                msg=str(e), title="Harlequin could not connect to snowflake."
             ) from e
 
     def execute(self, query: str) -> HarlequinCursor | None:
         try:
-            cur = self.conn.execute(query)  # type: ignore
+            cur = self.conn.cursor().execute(query)  # type: ignore
         except Exception as e:
             raise HarlequinQueryError(
                 msg=str(e),
@@ -64,20 +73,23 @@ class MyConnection(HarlequinConnection):
             ) from e
         else:
             if cur is not None:
-                return MyCursor(cur)
+                return SnowflakeCursor(cur)
             else:
                 return None
 
     def get_catalog(self) -> Catalog:
-        databases = self.conn.list_databases()
+        ## TODO double check this actually works
+        databases = self.conn.cursor().execute("SHOW DATABASES")
         db_items: list[CatalogItem] = []
         for db in databases:
-            schemas = self.conn.list_schemas_in_db(db)
+            schemas = self.conn.cursor().execute(f"SHOW SCHEMAS IN DATABASE {db}")
             schema_items: list[CatalogItem] = []
             for schema in schemas:
-                relations = self.conn.list_relations_in_schema(schema)
+                ## do again for views
+                relations = self.conn.cursor().execute(f'show tables in schema "{db}"."{schema}"')
                 rel_items: list[CatalogItem] = []
                 for rel, rel_type in relations:
+                    ## todo columns... informations chema right?
                     cols = self.conn.list_columns_in_relation(rel)
                     col_items = [
                         CatalogItem(
@@ -118,7 +130,8 @@ class MyConnection(HarlequinConnection):
         return Catalog(items=db_items)
 
     def get_completions(self) -> list[HarlequinCompletion]:
-        extra_keywords = ["foo", "bar", "baz"]
+        ## TODO list of snowflake functions that I should include
+        extra_keywords = []
         return [
             HarlequinCompletion(
                 label=item, type_label="kw", value=item, priority=1000, context=None
@@ -127,13 +140,13 @@ class MyConnection(HarlequinConnection):
         ]
 
 
-class MyAdapter(HarlequinAdapter):
-    ADAPTER_OPTIONS = MYADAPTER_OPTIONS
+class SnowflakeAdapter(HarlequinAdapter):
+    ADAPTER_OPTIONS = SNOWFLAKEADAPTER_OPTIONS
 
     def __init__(self, conn_str: Sequence[str], **options: Any) -> None:
         self.conn_str = conn_str
         self.options = options
 
-    def connect(self) -> MyConnection:
-        conn = MyConnection(self.conn_str, self.options)
+    def connect(self) -> SnowflakeConnection:
+        conn = SnowflakeConnection(self.conn_str, self.options)
         return conn
