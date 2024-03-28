@@ -4,7 +4,7 @@ import pytest
 from harlequin.adapter import HarlequinAdapter, HarlequinConnection, HarlequinCursor
 from harlequin.catalog import Catalog, CatalogItem
 from harlequin.exception import HarlequinConnectionError, HarlequinQueryError
-from harlequin_snowflake.adapter import SnowflakeAdapter, SnowflakeCursorSnowflakeConnection
+from harlequin_snowflake.adapter import SnowflakeAdapter, SnowflakeConnection
 from textual_fastdatatable.backend import create_backend
 
 if sys.version_info < (3, 10):
@@ -23,22 +23,18 @@ def test_plugin_discovery() -> None:
 
 
 def test_connect() -> None:
-    conn = SnowflakeAdapter(conn_str=tuple()).connect()
+    conn = SnowflakeAdapter(conn_str=None, username='ryan@sundeck.io', account='wua94396').connect()
     assert isinstance(conn, HarlequinConnection)
-
-
-def test_init_extra_kwargs() -> None:
-    assert SnowflakeAdapter(conn_str=tuple(), foo=1, bar="baz").connect()
 
 
 def test_connect_raises_connection_error() -> None:
     with pytest.raises(HarlequinConnectionError):
-        _ = SnowflakeAdapter(conn_str=("foo",)).connect()
+        _ = SnowflakeAdapter(conn_str=None, account="foo", username="bar").connect()
 
 
 @pytest.fixture
 def connection() -> SnowflakeConnection:
-    return SnowflakeAdapter(conn_str=tuple()).connect()
+    return SnowflakeAdapter(conn_str=None, username='ryan@sundeck.io', account='wua94396').connect()
 
 
 def test_get_catalog(connection: SnowflakeConnection) -> None:
@@ -56,7 +52,7 @@ def test_execute_ddl(connection: SnowflakeConnection) -> None:
 def test_execute_select(connection: SnowflakeConnection) -> None:
     cur = connection.execute("select 1 as a")
     assert isinstance(cur, HarlequinCursor)
-    assert cur.columns() == [("a", "##")]
+    assert cur.columns() == [("a", "NUMBER")]
     data = cur.fetchall()
     backend = create_backend(data)
     assert backend.column_count == 1
